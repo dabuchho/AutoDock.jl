@@ -6,14 +6,23 @@ struct Scale{T<:Real}
     torsion::T
 end
 
-
+# typedef std::size_t sz;           # => size of any object
+# typedef std::vector<sz> szv;      # => vector of object sizes ? 
 struct ConfSize
-    ligands::Real   # AutoDock typed this szv (number of elements in a vector)
-    flex::Real      # szv
-    degrees_of_freedom # = sum(ligands) + sum(flex) + 6*length(ligands) # ?
-end
+    ligands::Vector{Int64}   # AutoDock typed this szv (number of elements in a vector)
+    flex::Vector{Int64}      # szv
+    degrees_of_freedom::Int64
+    function ConfSize(ligands, flex)
+        new(ligands,
+            flex,
+            sum(ligands) + sum(flex) + 6*length(ligands) # ?
+        ) 
+    end
+end         # this could be combined with BALL
 
-# ...
+# used in LigandConf and ResidueConf
+function torsions_set_to_null()
+end
 
 struct RigidChange{T<:AbstractVector}
     position

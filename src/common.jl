@@ -1,7 +1,7 @@
 
 # this was taken from AutoDock. Use modulo instead??
 # Normalizes any radians such that ϑ ∈ [-π, +π]
-function normalize_angle(ϑ::Number)
+function normalize_angle(ϑ::T)::T where T
     if ϑ > 3π
         n = (ϑ - π) / (2π)
         ϑ -= 2π*ceil(n)
@@ -15,7 +15,7 @@ function normalize_angle(ϑ::Number)
     elseif ϑ < -π
         ϑ += 2π
     end
-    ϑ
+    T(ϑ)
 end
 
 
