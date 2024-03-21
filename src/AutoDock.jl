@@ -8,11 +8,14 @@ using LinearAlgebra
 using StaticArrays
 using Intervals: Interval
 using ArgCheck
+using Distances: sqeuclidean
 
 include("common.jl")
 
+include("random.jl")
+
 include("quaternion.jl")
-#export quaternion_norm_sqr
+
 include("conf.jl")
 
 end
