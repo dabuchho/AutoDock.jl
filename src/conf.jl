@@ -48,7 +48,7 @@ function torsions_too_close(
     torsions2::Vector{T}, 
     cutoff::T
 ) where T
-    @argcheck size(torsions1) == size(torsions2)
+    @assert size(torsions1) == size(torsions2)
     for i in eachindex(torsions1)
         if abs(normalize_angle(torsions1[i] - torsions2[i])) > cutoff
             return false
@@ -64,7 +64,7 @@ function torsions_generate!(
     rp::T, 
     rs::Vector{T}       # rs as kwargs... ?
 ) where T
-    @argcheck size(rs) == size(torsions)    # rs not always present => add nothing condition?
+    @assert size(rs) == size(torsions)    # rs not always present => add nothing condition?
     for i in eachindex(torsions)
         if rand(T) < rp                     # rs condition
             torsions[i] = rs[i]

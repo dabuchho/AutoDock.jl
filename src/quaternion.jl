@@ -55,7 +55,7 @@ end
 # from Documentation Quaternions.jl (named angle_to_quaternion in AutoDock)
 # ϑ must be a Number, because π is typed as Irrational
 function quaternion_from_angle(axis::Vector{T}, ϑ::T)::Quaternion{T} where T
-    @argcheck length(axis) == 3
+    @assert length(axis) == 3
     ϑ = normalize_angle(ϑ)
     s, c = sincos(ϑ / 2)
     axis = normalize(axis)
@@ -78,7 +78,7 @@ end
 
 # named quaternion_to_angle in AutoDock
 function vector_from_quaternion(q::Quaternion{T})::Vector{T} where T
-    @argcheck quaternion_is_normalized(q)
+    @assert quaternion_is_normalized(q)
     c = q.s
     if c > -1 && c < 1
         ϑ = 2*acos(c)  # cos⁻¹(c) ∈ [0, +π]
@@ -170,7 +170,7 @@ end                     # this is not very pretty
 
 
 function quaternion_increment(q::Quaternion{T}, v::Vector{T})::Quaternion{T} where T
-    @argcheck quaternion_is_normalized(q)
+    @assert quaternion_is_normalized(q)
     q = quaternion_from_angle(v) * q
     quaternion_normalize(q)
 end
@@ -182,8 +182,8 @@ function quaternion_difference(
     a::Quaternion{T}
 )::Vector{T} where T
 
-    @argcheck quaternion_is_normalized(b)
-    @argcheck quaternion_is_normalized(a)
+    @assert quaternion_is_normalized(b)
+    @assert quaternion_is_normalized(a)
     tmp = b
     tmp /= a
     vector_from_quaternion(tmp)
