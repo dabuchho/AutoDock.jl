@@ -1,0 +1,8 @@
+
+
+
+
+
+struct Foo
+    x
+end

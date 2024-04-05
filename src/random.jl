@@ -7,4 +7,15 @@ function random_inside_box(corner1::Vector{T}, corner2::Vector{T}) where T
     tmp
 end
 
+ # sphere of radius 1 centered in the origin
+function random_inside_sphere(type::T = Float64) where T
+    tmp = rand(type, 3) .* 2 .- 1
+    if sqr(tmp) < 1     # sqrt() not required, since radius is 1
+        return tmp
+    else
+        random_inside_sphere(type)
+    end
+end
+
+
 # consider adding a function rand(lower_bound, upper_bound)
