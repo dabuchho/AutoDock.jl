@@ -15,15 +15,10 @@ function normalize_angle(ϑ::T)::T where T
     elseif ϑ < -π
         ϑ += 2π
     end
-    ϑ
+    T(ϑ)
 end
 
 
 function is_normalized(ϑ::Number)
     ϑ ∈ Interval(π, π) ? true : false
-end
-
-
-function sqr(v::Vector{T}) where T
-    sum(map(x -> x*x, v))
 end
