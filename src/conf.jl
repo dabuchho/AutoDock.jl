@@ -300,8 +300,8 @@ function Change(s::ConfSize, type::T=Float64) where T
     Change(ligands, flex)
 end
 
-
-function operator(c::Change, index::T) where T
+# AutoDock includes a pointer method as well as an identical reference method?
+function (c::Change)(index::T) where T
     for i in eachindex(c.ligands)
         lig = c.ligands[i]
         if index < 3 return lig.rigid.position[index] end
@@ -318,12 +318,146 @@ function operator(c::Change, index::T) where T
     end
 end
 
-struct Conf{T<:AbstractFloat}
-    ligands::Vector{LigandChange{T}}
-    flex::Vector{ResidueChange{T}}
+
+function num_floats(c::Change)
+    tmp = 0
+    for i in eachindex(c.ligands)
+        tmp += 6 + length(c.ligands[i].torsions)
+    end
+    for i in eachindex(c.flex)
+        tmp += length(c.flex[i].torsions)
+    end
+    tmp
 end
 
-# ...
+# does probably not need to be mutable, because we change elements inside of Vector
+struct Conf{T<:AbstractFloat}
+    ligands::Vector{LigandConf{T}}
+    flex::Vector{ResidueConf{T}}
+end
+
+
+function Conf(s::ConfSize, type::T=Float64) where T
+    # almost identical to Change
+    ligands = Vector{LigandConf{type}}(undef, length(s.ligands))
+    flex = Vector{ResidueConf{type}}(undef, length(s.flex))
+    
+    for i in eachindex(ligands)
+        ligands[i] = LigandConf(RigidConf{type}(), fill(type(0), s.ligands[i]))
+    end
+    
+    for i in eachindex(flex)
+        flex[i] = ResidueConf(fill(type(0), s.flex[i]))
+    end
+    
+    Conf(ligands, flex)
+end
+
+
+function set_to_null!(conf::Conf{T}) where T
+    for i in eachindex(conf.ligands)
+        set_to_null!(conf.ligands[i]) # set_to_null! called on each LigandConf
+    end
+    for i in eachindex(conf.flex)
+        set_to_null!(conf.flex[i]) # set_to_null! called on each ResidueConf
+    end
+end
+
+
+function increment!(conf::Conf{T}, c::Change{T}, factor::T) where T
+    for i in eachindex(conf.ligands)
+        increment!(conf.ligands[i], c.ligands[i], factor)
+    end
+    for i in eachindex(conf.flex)
+        increment!(conf.flex[i], c.flex[i], factor)
+    end
+end
+
+
+function internal_too_close(
+    conf1::Conf{T}, 
+    conf2::Conf{T}, 
+    torsions_cutoff::T
+) where T
+    @assert length(conf1.ligands) == length(conf2.ligands)
+    for i in eachindex(conf1.ligands) # could be written more elegently with all()
+        if !torsions_too_close(
+            conf1.ligands[i].torsions, 
+            conf2.ligands[i].torsions, 
+            torsions_cutoff
+            )
+            return false
+        end
+    end
+    return true
+end
+
+
+function external_too_close(
+    conf1::Conf{T}, 
+    conf2::Conf{T}, 
+    cutoff::Scale{T}
+) where T
+    @assert length(conf1.ligands) == length(conf2.ligands)
+    for i in eachindex(conf1.ligands) # could be written more elegently with all()
+        if !too_close(
+            conf1.ligands[i].rigid, 
+            conf2.ligands[i].rigid, 
+            cutoff.position, 
+            cutoff.orientation
+            )
+            return false
+        end
+    end
+    @assert length(conf1.flex) == length(conf2.flex)
+    for i in eachindex(conf1.flex)
+        if !torsions_too_close(
+            conf1.flex[i].torsions, 
+            conf2.flex[i].torsions, 
+            cutoff.torsions
+            )
+            return false
+        end
+    end
+    return true
+end
+
+
+function too_close(conf1::Conf{T}, conf2::Conf{T}, cutoff::Scale{T}) where T
+    (internal_too_close(conf1, conf2, cutoff.torsions) && 
+     external_too_close(conf1, conf2, cutoff))
+end
+
+
+function generate_internal!(
+    conf::Conf{T}, 
+    torsion_spread::T, 
+    rp::T, 
+    rs::Union{Conf{T}, Nothing} = nothing   # rs does NOT need to exist
+) where T
+    for i in eachindex(conf.ligands)
+        zero(conf.ligands[i].rigid.position)
+        # check, if qt_identity works for different types
+        conf.ligands[i].rigid.orientation = qt_identity(T) # Quaternion{T}(1,0,0,0)
+        # check wether rs->ligands[i].rigid is referring to conf or rs!!!
+        isnothing(rs) ? torsions_rs = rs : torsions_rs = rs.ligands[i].torsions
+        torsions_generate!(ligands[i].torsions, torsion_spread, rp, torsions_rs)
+    end
+end
+
+
+function generate_external!(
+    conf::Conf{T},
+    spread::Scale{T}, 
+    rp::T,
+    rs::Union{Conf{T}, Nothing} = nothing
+) where T
+    for i in eachindex(conf.ligands)
+        # check wether rs->ligands[i].rigid is referring to conf or rs!!!
+        isnothing(rs) ? rigid_conf_rs = rs : rigid_conf_rs = rs.ligands[i].rigid
+    end
+end
+
 
 struct OutputType
     c::Conf
