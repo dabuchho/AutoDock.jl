@@ -3,6 +3,7 @@
 # https://arxiv.org/pdf/math/0701759.pdf
 
 export
+    qt_identity,
     generate_quaternion,
     quaternion_norm_sqr, 
     quaternion_normalize, 
@@ -14,6 +15,10 @@ export
     quaternion_increment, 
     quaternion_difference
 
+    
+function qt_identity(type::T) where T
+    Quaternion{type}(1)
+end
 
 # only used for testing
 function generate_quaternion(a::T,b::T,c::T,d::T)::Quaternion{T} where T
