@@ -21,18 +21,18 @@ function qt_identity(type::T) where T
 end
 
 # only used for testing
-function generate_quaternion(a::T,b::T,c::T,d::T)::Quaternion{T} where T
+function generate_quaternion(a::T,b::T,c::T,d::T) where T
     Quaternion{T}(a,b,c,d)
 end
 
 
-function quaternion_norm_sqr(q::Quaternion{T})::T where T
+function quaternion_norm_sqr(q::Quaternion{T}) where T
     q.s*q.s + q.v1*q.v1 + q.v2*q.v2 + q.v3*q.v3    
 end
 
 
 # same as normalize(q::Quaternion) but faster
-function quaternion_normalize(q::Quaternion{T})::Quaternion{T} where T
+function quaternion_normalize(q::Quaternion{T}) where T
     s::T = quaternion_norm_sqr(q)
     a::T = sqrt(s)
     q *= 1/a    # slightly faster than q /= a
@@ -40,7 +40,7 @@ end
 
 
 # triple redundant
-function quaternion_is_normalized(q::Quaternion{T})::Bool where T
+function quaternion_is_normalized(q::Quaternion{T}) where T
     quaternion_norm_sqr(q) ≈ 1 && norm(q) ≈ 1 && abs(q) ≈ 1 
 end
 
@@ -63,8 +63,10 @@ function quaternion_from_angle(axis::Vector{T}, ϑ::T)::Quaternion{T} where T
     @assert length(axis) == 3
     ϑ = normalize_angle(ϑ)
     s, c = sincos(ϑ / 2)
-    axis = normalize(axis)
-    Quaternion{T}(c, s*axis[1], s*axis[2], s*axis[3])
+    sum(axis) > eps(T) ? (
+        axis = normalize(axis);
+        Quaternion{T}(c, s*axis[1], s*axis[2], s*axis[3])
+    ) : Quaternion{T}(1,0,0,0)
 end
 
 a = [2.0f0,3.0f0,1.0f0]
