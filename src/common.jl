@@ -1,3 +1,8 @@
+export
+    normalize_angle,
+    is_normalized,
+    sqr
+
 
 # this was taken from AutoDock. Use modulo instead??
 # Normalizes any radians such that ϑ ∈ [-π, +π]
