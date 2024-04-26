@@ -1,7 +1,7 @@
 # configuration
 export 
     Scale, 
-    ConfSize, 
+    ConfSize, # is ConfSize necessary?
     torsions_set_to_null!, # could rename torsions_ methods because multiple dispatch
     torsions_increment!,
     torsions_randomize!,
@@ -22,16 +22,17 @@ export
     ResidueChange,
     ResidueConf,
     Change,
-    operator,
     Conf
 
 
 
-struct Scale{T<:AbstractFloat}
+struct Scale{T<:Real}
     position::T       
     orientation::T  
     torsion::T
 end
+
+Scale{T}() where T<:Real = Scale(zero(T), zero(T), zero(T))
 
 # typedef std::size_t sz;           # => size of any object
 # typedef std::vector<sz> szv;      # => vector of object sizes ? 
@@ -39,6 +40,7 @@ struct ConfSize
     ligands::Vector{Int64}   # AutoDock typed this szv (number of elements in a vector)
     flex::Vector{Int64}      # szv
     degrees_of_freedom::Int64
+
     function ConfSize(ligands, flex)
         # 6 * number_of_atoms, because 3 translational and 3 rotational degrees
         # allow en empty ConfSize for now
@@ -53,6 +55,8 @@ struct ConfSize
     end
 end         # this could be combined with BALL
 
+ConfSize() = ConfSize(Int64[], Int64[])
+
 # used in LigandConf and ResidueConf
 function torsions_set_to_null!(torsions::Vector{T}) where T
     for i in eachindex(torsions)
@@ -64,7 +68,7 @@ end
 function torsions_increment!(torsions::Vector{T}, c::Vector{T}, factor::T) where T
     for i in eachindex(torsions)
         torsions[i] += normalize_angle(factor * c[i])
-        # AutoDock normalizes torsions[i] again ?
+        torsions[i] = normalize_angle(torsions[i])
     end
 end
 
@@ -128,7 +132,7 @@ RigidConf{T}() where T = RigidConf(
 
 function set_to_null!(rconf::RigidConf{T}) where T
     rconf.position = zeros(T, 3)
-    rconf.position = zeros(T, 3)
+    rconf.position = Quaternion{T}(1,0,0,0)
 end
 
 
@@ -198,12 +202,16 @@ end
 # apply orientation of RigidConf on in::Vector to receive out::Vector
 function apply!(
     rconf::RigidConf{T}, 
-    in::Vector{T}, # const
-    out::Vector{T},
+    in::Vector{Vector{T}},
+    out::Vector{Vector{T}}
+    #begin::Integer
+    #end::Integer
 ) where T
     @assert size(in) == size(out)
     m = rotation_from_quaternion(rconf.orientation)
-    mul!(out, m, in) + rconf.position
+    for i in eachindex(in) # begin:end
+        mul!(out[i], m, in[i]) + rconf.position
+    end
 end
 
 
@@ -212,12 +220,15 @@ struct LigandChange{T<:AbstractFloat}
     torsions::Vector{T}
 end
 
+LigandChange{T}() where T = LigandChange(RigidChange{T}(), T[])
+
 
 struct LigandConf{T<:AbstractFloat}
     rigid::RigidConf{T}
     torsions::Vector{T}
 end
 
+LigandConf{T}() where T = LigandConf(RigidConf{T}(), T[])
 
 function set_to_null!(lconf::LigandConf{T}) where T
     set_to_null!(lconf.rigid)
@@ -249,11 +260,13 @@ struct ResidueChange{T<:AbstractFloat}
     torsions::Vector{T}
 end
 
+ResidueChange{T}() where T = ResidueChange(T[])
 
 struct ResidueConf{T<:AbstractFloat}
     torsions::Vector{T}
 end
 
+ResidueConf{T}() where T = ResidueConf(T[])
 
 function set_to_null!(rconf::ResidueConf{T}) where T
     torsions_set_to_null!(rconf.torsions)
@@ -280,6 +293,9 @@ struct Change{T<:AbstractFloat}
 end
 
 
+Change{T}() where T = Change(LigandChange{T}[], ResidueChange{T}[])
+
+
 # This is super ugly. This constructor, when called, also always creates 
 # a new LigandChange and RigidChange object, which is not ideal.
 function Change(s::ConfSize, type::T=Float64) where T
@@ -299,6 +315,7 @@ function Change(s::ConfSize, type::T=Float64) where T
     
     Change(ligands, flex)
 end
+
 
 # AutoDock includes a pointer method as well as an identical reference method?
 function (c::Change)(index::T) where T
@@ -335,6 +352,9 @@ struct Conf{T<:AbstractFloat}
     ligands::Vector{LigandConf{T}}
     flex::Vector{ResidueConf{T}}
 end
+
+
+Conf{T}() where T = Conf(LigandConf{T}[], ResidueConf{T}[])
 
 
 function Conf(s::ConfSize, type::T=Float64) where T
@@ -441,7 +461,7 @@ function generate_internal!(
         conf.ligands[i].rigid.orientation = qt_identity(T) # Quaternion{T}(1,0,0,0)
         # check wether rs->ligands[i].rigid is referring to conf or rs!!!
         isnothing(rs) ? torsions_rs = rs : torsions_rs = rs.ligands[i].torsions
-        torsions_generate!(ligands[i].torsions, torsion_spread, rp, torsions_rs)
+        torsions_generate!(conf.ligands[i].torsions, torsion_spread, rp, torsions_rs)
     end
 end
 
@@ -453,23 +473,69 @@ function generate_external!(
     rs::Union{Conf{T}, Nothing} = nothing
 ) where T
     for i in eachindex(conf.ligands)
-        # check wether rs->ligands[i].rigid is referring to conf or rs!!!
         isnothing(rs) ? rigid_conf_rs = rs : rigid_conf_rs = rs.ligands[i].rigid
+        generate!(
+            conf.ligands[i].rigid, 
+            spread.position, 
+            spread.orientation, 
+            rp, 
+            rigid_conf_rs
+        )
+    end
+    for i in eachindex(conf.flex)
+        isnothing(rs) ? torsions_rs = rs : torsions_rs = rs.flex[i].torsions
+        torsions_generate!(
+            conf.flex[i].torsions, 
+            spread.torsion, 
+            rp, 
+            torsions_rs
+        )
     end
 end
 
 
-struct OutputType
-    c::Conf
-    e
-    lb
-    ub
-    intra
-    inter
-    conf_independent
-    unbound
-    total
-    coords
+function randomize!(
+    conf::Conf{T}, 
+    corner1::Vector{T}, 
+    corner2::Vector{T}
+) where T
+    for i in eachindex(conf.ligands)
+        randomize!(conf.ligands[i], corner1, corner2)
+    end
+    for i in eachindex(conf.flex)
+        randomize!(conf.flex[i])
+    end
+end
+
+
+struct OutputType{T}
+    c::Conf{T}
+    # what are all these member variables?
+    e::T
+    lb::T
+    ub::T
+    intra::T
+    inter::T
+    conf_independent::T
+    unbound::T
+    total::T
+    coords::Vector{T}
+end
+
+
+function OutputType{T}() where T
+    OutputType(
+        Conf{T}(), 
+        zero(T),
+        zero(T),
+        zero(T),
+        zero(T),
+        zero(T),
+        zero(T),
+        zero(T),
+        zero(T),
+        T[]
+    )
 end
 
 
