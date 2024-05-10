@@ -132,7 +132,7 @@ RigidConf{T}() where T = RigidConf(
 
 function set_to_null!(rconf::RigidConf{T}) where T
     rconf.position = zeros(T, 3)
-    rconf.position = Quaternion{T}(1,0,0,0)
+    rconf.orientation = Quaternion{T}(1,0,0,0)
 end
 
 
@@ -148,7 +148,7 @@ function randomize!(
     corner1::Vector{T}, 
     corner2::Vector{T}
 ) where T
-    rconf.position = random_in_box(corner1, corner2)
+    rconf.position = random_inside_box(corner1, corner2)
     rconf.orientation = random_quaternion(T)
 end
 
@@ -159,24 +159,26 @@ function too_close(
     position_cutoff::T, 
     orientation_cutoff::T
 ) where T
-    if sqeuclidean(rconf1.position, rconf2.position) > sqr(position_cutoff)
+    if sqeuclidean(rconf1.position, rconf2.position) > 
+        position_cutoff * position_cutoff
         return false
     end
-    if sqr(quaternion_difference(rconf1.orientation, rconf2.orientation)) > sqr(orientation_cutoff)
+    if sqr(quaternion_difference(rconf1.orientation, rconf2.orientation)) > 
+        orientation_cutoff * orientation_cutoff
         return false
     end
     return true
 end
 
-
+# mutates position of a RigidConf within a sphere of radius spread
 function mutate_position!(rconf::RigidConf{T}, spread::T) where T
-    rconf.position += spread * random_inside_sphere(spread)
+    rconf.position += spread * random_inside_sphere(T)
 end
 
-
+# mutates orientation of a RigidConf within the value of ±spread
 function mutate_orientation!(rconf::RigidConf{T}, spread::T) where T
     tmp = spread * random_inside_sphere(T)
-    quaternion_increment(rconf.orientation, tmp)
+    rconf.orientation = quaternion_increment(rconf.orientation, tmp)
 end
 
 
