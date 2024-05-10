@@ -61,26 +61,33 @@ end
 # ϑ must be a Number, because π is typed as Irrational
 function quaternion_from_angle(axis::Vector{T}, ϑ::T)::Quaternion{T} where T
     @assert length(axis) == 3
-    ϑ = normalize_angle(ϑ)
-    s, c = sincos(ϑ / 2)
-    sum(axis) > eps(T) ? (
-        axis = normalize(axis);
-        Quaternion{T}(c, s*axis[1], s*axis[2], s*axis[3])
-    ) : Quaternion{T}(1,0,0,0)
+    if axis == zeros(T, 3) # because normalize([0,0,0] = [NaN,NaN,NaN])
+        return Quaternion{T}(1.0, 0.0, 0.0, 0.0)
+    else
+        ϑ = normalize_angle(ϑ)
+        s, c = sincos(ϑ / 2)
+        axis = normalize(axis)
+        return Quaternion{T}(c, s*axis[1], s*axis[2], s*axis[3])
+    end
 end
 
-a = [2.0f0,3.0f0,1.0f0]
-sig = 4.7f0
 
-
-function quaternion_from_angle(v::Vector{T})::Quaternion{T} where T
+function quaternion_from_angle(v::Vector{T}) where T
     ϑ = norm(v, 2)              # 2-Norm of v
+    if ϑ > eps(T)
+        axis = (1 / ϑ) * v
+        quaternion_from_angle(axis, ϑ)
+    else
+        Quaternion{T}(1.0, 0.0, 0.0, 0.0)
+    end
+    #=
     if ϑ > eps(T)
         axis = (1 / ϑ) * v
         return quaternion_from_angle(axis, ϑ)
     else
         Quaternion{T}(1.0, 0.0, 0.0, 0.0)  # Identity Quaternion
     end
+    =#
 end
 
 # named quaternion_to_angle in AutoDock
