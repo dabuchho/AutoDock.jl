@@ -1,3 +1,8 @@
+export
+    random_inside_box,
+    random_inside_sphere
+
+
 # This does NOT work with Integer bound boxes!
 function random_inside_box(corner1::Vector{T}, corner2::Vector{T}) where T
     tmp::Vector{T} = zeros(T, 3)
