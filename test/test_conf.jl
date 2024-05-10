@@ -1,5 +1,3 @@
-using Quaternions
-
 # example testing
 # create H₂O Molecule
 
@@ -22,7 +20,9 @@ torsions
 
 # general testing
 @testitem "Configurations" begin
-    # Empty instances
+    using Quaternions
+    using Distances: euclidean
+    # Constructors and Type Conservation
     for T in [Float32, Float64]
         @test typeof(Scale{T}())         == Scale{T}
         @test typeof(ConfSize())         == ConfSize
@@ -48,6 +48,7 @@ torsions
         #torsions_too_close()   # Conf
         #torsions_generate!()   # Conf
     end
+    ##############################################################
 
     # Scale
     Scale{Float64}(10, 10, 10) # only used for cutoffs. Set very high here
@@ -57,33 +58,73 @@ torsions
 
     for T in [Float32, Float64]
         # RigidChange
-        rchan_position = rand(T, 3)    # always single atom position?
-        rchan_orientation = rand(T, 3) # always single atom orientation?
-        rchan = RigidChange(rchan_position, rchan_orientation)
+        rig_chan_position = rand(T, 3)    # always single atom position?
+        rig_chan_orientation = rand(T, 3) # always single atom orientation?
+        rig_chan = RigidChange(rig_chan_position, rig_chan_orientation)
 
         # RigidConf
-        rconf_position = rand(T, 3)              # always single atom position?
-        rconf_orientation = random_quaternion(T) # always single atom orientation?
-        rconf = RigidConf(rconf_position, rconf_orientation)
+        rig_conf_position = rand(T, 3)              # always single atom position?
+        rig_conf_orientation = random_quaternion(T) # always single atom orientation?
+        rig_conf = RigidConf(rig_conf_position, rig_conf_orientation)
         
         factor1 = T(1.0) # does not effect increment!
-        increment!(rconf, rchan, factor1)
-        @test rconf.position == rconf_position + rchan_position
+        increment!(rig_conf, rig_chan, factor1)
+        @test rig_conf.position == rig_conf_position + rig_chan_position
         # TODO: find way to predict the effect of the rotation
-        @test typeof(rconf.orientation) == Quaternion{T}
-        # different factor
-        # ...
+        @test typeof(rig_conf.orientation) == Quaternion{T}
+        
+        factor2 = T(2.0) # factor ≠ 1
+        increment!(rig_conf, rig_chan, factor2)
+        #@test rig_conf.position == rig_conf_position + rig_chan_position
 
-        # randomize!()
-        # too_close()
-        # mutate_position!()
-        # mutate_orientation!()
+        corner1 = T[0,0,0]
+        corner2 = T[1,1,1]
+        randomize!(rig_conf, corner1, corner2)
+        @test euclidean(rig_conf.position, corner1) < T(sqrt(3))
+        @test euclidean(rig_conf.position, corner2) < T(sqrt(3))
+        #@test rig_conf.orientation # ...
+        
+
+        rig_conf1 = RigidConf{T}(T[0,0,0], Quaternion{T}(1,0,0,0))
+        rig_conf2 = RigidConf{T}(T[1,0,0], Quaternion{T}(0,0,0,1))
+        pos_cutoff = T(0)   # low cutoff
+        ori_cutoff = T(100) # high cutoff
+        @test too_close(rig_conf1, rig_conf2, pos_cutoff, ori_cutoff) == false
+        pos_cutoff = T(100) # high cutoff
+        ori_cutoff = T(0)   # low cutoff
+        @test too_close(rig_conf1, rig_conf2, pos_cutoff, ori_cutoff) == false
+        rig_conf3 = RigidConf{T}(T[0,0,0], Quaternion{T}(1,0,0,0))
+        pos_cutoff = T(0)
+        # too_close should return true for overlaps, independent of the cutoff
+        @test too_close(rig_conf1, rig_conf3, pos_cutoff, ori_cutoff) == true
+        
+        current_pos = rig_conf1.position
+        current_ori = rig_conf1.orientation
+        spread = T(2.0)
+        mutate_position!(rig_conf1, spread)
+        @test current_pos != rig_conf1.position
+        @test euclidean(current_pos, rig_conf1.position) <= spread
+        # TODO: find better test
+        mutate_orientation!(rig_conf1, spread)
+        @test current_ori != rig_conf1.orientation # this should almost never fail
         # generate!()
         # apply!()
 
-        set_to_null!(rconf)
-        @test rconf.position    == zeros(T, 3)
-        @test rconf.orientation == Quaternion{T}(1,0,0,0)
+        set_to_null!(rig_conf)
+        @test rig_conf.position    == zeros(T, 3)
+        @test rig_conf.orientation == Quaternion{T}(1,0,0,0)
+
+        # LigandChange
+        # LigandConf
+
+        # ResidueChange
+        # ResidueConf
+
+        # Change
+        # Conf
+
+        # OutputType
+
     end
 
 
@@ -91,3 +132,11 @@ torsions
     # Create a mockup molecule
     # ...   
 end
+using Quaternions
+using AutoDock
+quaternion_difference(Quaternion{Float64}(1.0,0,0,0),Quaternion{Float64}(1,0,0,0))
+
+rc = RigidConf{Float64}()
+old_ori = rc.orientation
+mutate_orientation!(rc, 2.0)
+curr_ori = rc.orientation
